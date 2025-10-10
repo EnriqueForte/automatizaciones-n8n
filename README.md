@@ -116,7 +116,6 @@ o
 ## 🖼 Imágenes y diagramas
 
 - **Incluye capturas** del workflow y un **diagrama** simple del flujo de datos.
-- **Evita** capturar claves, IDs sensibles o webhooks. Si es inevitable, **enmascara**.
 
 ---
 
