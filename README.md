@@ -28,8 +28,11 @@ workflows/
 docs/
   └─ architecture.md
 img/
-  ├─ n8n-workflow-overview.png        # (opcional)
-  └─ telegram-alert-example.png       # (opcional)
+  ├─ Comando PowerShell.png      
+  └─ Diagrama Flujo luego de Ejecucion.png
+  └─ Diagrama Flujo.png
+  └─ Exportacion a GoogleSheet.png
+  └─ Mensajes enviados a Telegram Alertas.png  
 .env.example
 .gitattributes
 .gitignore
