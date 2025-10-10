@@ -1,130 +1,128 @@
-# 🚨 n8n – VirusTotal IP Checker (Webhook → VT → Alerting)
+# 🛠️ Automatizaciones n8n para Ciberseguridad
 
-Automatización n8n para **analizar IPs contra VirusTotal** y **enviar alertas** cuando se detecten indicadores de riesgo. Incluye **registro histórico** en Google Sheets y notificación por **Telegram**.
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
+![Made with n8n](https://img.shields.io/badge/Made%20with-n8n-blue)
+![Status](https://img.shields.io/badge/status-active-success)
+![Security First](https://img.shields.io/badge/security-first-critical)
 
-> **Nota de seguridad:** Este repositorio **no** contiene secretos. Las claves y IDs deben configurarse en **credenciales/variables de n8n** o en tu entorno local. Sustituye los placeholders por tus valores.
-
----
-
-## 🧩 ¿Qué hace?
-
-1. **Entrada (Webhook):** recibe una o varias IPs (`["1.2.3.4","8.8.8.8"]` o cadena separada por comas/espacios).
-2. **Consulta VirusTotal (HTTP):** `GET /api/v3/ip_addresses/{ip}`.
-3. **Parsing:** resume `malicious`, `suspicious`, `harmless`, `undetected`, `reputation`, `ASN`, `país`.
-4. **Decisión (IF):** si hay riesgo → alerta.
-5. **Salida:**
-   - **Telegram:** mensaje con resumen y enlace directo al informe VT.
-   - **Google Sheets:** registro con `timestamp`, IP y métricas, usando `day_key` = `IP_YYYY-MM-DD` para evitar duplicados diarios.
-
-El flujo está en `workflows/VirusTotal_IP_Checker.json`. Documentación adicional en `docs/`.
+Repositorio monorepo con **automatizaciones de ciberseguridad** construidas en **n8n** (detección, enriquecimiento de IOCs, alertas y registro). Cada proyecto vive en su propia carpeta con su **README**, **workflow(s)**, **docs** e **imágenes**.
 
 ---
 
-## 🗂 Estructura
+## 📚 Índice
+
+- [Proyectos incluidos](#proyectos-incluidos)
+- [Estructura del repositorio](#estructura-del-repositorio)
+- [Requisitos comunes](#requisitos-comunes)
+- [Guía rápida](#guía-rápida)
+- [Convenciones para nuevos proyectos](#convenciones-para-nuevos-proyectos)
+- [Checklist de seguridad antes de subir](#checklist-de-seguridad-antes-de-subir)
+- [Roadmap](#roadmap)
+- [Contribuir](#contribuir)
+- [Licencia](#licencia)
+
+---
+
+## 🚀 Proyectos incluidos
+
+- **[VirusTotal_IP_Checker](./VirusTotal_IP_Checker/)**  
+  **Descripción:** Webhook que recibe IPs, consulta **VirusTotal**, resume indicadores (malicious/suspicious/harmless/undetected, reputación, ASN/País) y lanza **alertas** (Telegram) + **registro** (Google Sheets).  
+  **Carpetas:** `workflows/`, `docs/`, `img/`  
+  **Uso:** Importar `workflows/VirusTotal_IP_Checker.json` en n8n, configurar credenciales y probar el webhook.
+
+> Este índice crecerá a medida que se añadan más automatizaciones (p.ej., URLs, dominios, hash de ficheros, feeds TI, integraciones SIEM, etc.).
+
+---
+
+## 🗂️ Estructura del repositorio
 
 ```
-workflows/
-  └─ VirusTotal_IP_Checker.json
-docs/
-  └─ architecture.md
-img/
-  ├─ Comando PowerShell.png      
-  └─ Diagrama Flujo luego de Ejecucion.png
-  └─ Diagrama Flujo.png
-  └─ Exportacion a GoogleSheet.png
-  └─ Mensajes enviados a Telegram Alertas.png  
-.env.example
-.gitattributes
-.gitignore
-LICENSE
-README.md
+.
+├─ VirusTotal_IP_Checker/         # Proyecto 1
+│  ├─ workflows/                  # Workflows n8n (JSON)
+│  ├─ docs/                       # Diagramas/guías técnicas
+│  ├─ img/                        # Capturas enmascaradas
+│  ├─ .env.example                # Variables de entorno (placeholders)
+│  └─ README.md                   # README del proyecto
+├─ .gitignore
+├─ LICENSE
+└─ README.md                      # Este archivo (índice del monorepo)
 ```
 
 ---
 
-## ⚙️ Requisitos
+## 🧩 Requisitos comunes
 
 - **n8n** (Cloud o self-hosted).
-- Credenciales:
-  - **VirusTotal API Key**.
-  - **Telegram** (bot token + chatId) si usas alertas.
-  - **Google Sheets** (OAuth) si usas el histórico.
+- **Credenciales seguras** por proyecto (p. ej., API keys, OAuth).
+- **Placeholders** en los JSON exportados. Nunca subir secretos.
 
 ---
 
-## 🔐 Configuración de secretos
+## ⚡ Guía rápida
 
-Configura **credenciales de n8n** y/o variables de entorno. Este repo provee `.env.example` únicamente como guía:
+1. **Clonar:**
+   ```bash
+   git clone https://github.com/EnriqueForte/automatizaciones-n8n.git
+   cd automatizaciones-n8n
+   ```
+2. **Elegir proyecto** (ej.: VirusTotal_IP_Checker) y leer su `README.md`.
+3. **Importar en n8n** → *Import from File* → `workflows/…json`.
+4. **Configurar credenciales** en n8n (API keys, Telegram, Google).
+5. **Probar el endpoint** (Webhook de test/producción según README del proyecto).
 
-```bash
-VT_API_KEY=YOUR_VT_API_KEY
-TELEGRAM_CHAT_ID=YOUR_TELEGRAM_CHAT_ID
-GSHEET_ID=YOUR_GOOGLE_SHEET_ID
-```
-
-En el JSON de ejemplo no hay claves reales. Si importas un flujo propio, **no** subas claves al repositorio.
-
----
-
-## ▶️ Uso
-
-### 1) Importa el workflow
-- En n8n: **Import from File** → `workflows/VirusTotal_IP_Checker.json`.
-
-### 2) Configura credenciales
-- **HTTP Request (VirusTotal):** mueve `x-apikey` a una credencial/variable segura.
-- **Telegram:** selecciona tu credencial del bot y el `chatId`.
-- **Google Sheets:** selecciona cuenta y `documentId`/`sheetName`.
-
-### 3) Endpoint de prueba
-- Webhook (POST) con payload JSON:
-```json
-{ "ips": ["1.2.3.4", "8.8.8.8"] }
-```
-o
-```json
-{ "ips": "1.2.3.4, 8.8.8.8" }
-```
-
-### 4) Resultado
-- Si la IP tiene señales de riesgo → recibirás un mensaje en **Telegram** con resumen y enlace a VT.
-- Todas las IPs se registran en **Google Sheets** (si activado).
+> Consejo: mantén **variables y credenciales** fuera del repo; usa **Credentials** de n8n o variables de entorno.
 
 ---
 
-## 🧠 Detalles técnicos
+## 🧭 Convenciones para nuevos proyectos
 
-- **Normalización de IPs** (limpieza y deduplicado).
-- **Split in Batches** para procesar múltiples IPs de forma segura.
-- **Clave de unicidad** en Sheets: `day_key = IP_YYYY-MM-DD`.
-- **Mensajes de alerta** con resumen compacto (VT stats, reputación, ASN/ASOwner, país) y enlace directo al informe.
-
-> Nodos destacados: Webhook → Validate & Prepare → Split in Batches → HTTP Request (VT) → Parse → IF → Telegram/Sheets.
-
----
-
-## 📈 Mejoras sugeridas
-
-- **Backoff** ante rate limits de VT (retry con espera exponencial).
-- **Soporte IPv6**.
-- **Etiquetado por severidad** (umbral de `malicious`/`suspicious`).
-- **Dashboard** (Sheets/Looker Studio o Grafana) para tendencias.
-- **SECURITY.md** para recepción responsable de vulnerabilidades.
+- **Nombre de carpeta:** `Nombre_Proyecto` (camel/pascal con guiones bajos o kebab-case `nombre-proyecto`).
+- **Estructura mínima:**
+  ```
+  Nuevo_Proyecto/
+  ├─ workflows/
+  ├─ docs/
+  ├─ img/
+  ├─ .env.example
+  └─ README.md
+  ```
+- **README del proyecto:** objetivos, arquitectura, requisitos, pasos de uso, variables, endpoints de prueba, mejoras futuras.
+- **Sanitización:** JSON sin secretos (placeholders p.ej. `YOUR_API_KEY`).
 
 ---
 
-## 🖼 Imágenes y diagramas
+## ✅ Checklist de seguridad antes de subir
 
-- **Incluye capturas** del workflow y un **diagrama** simple del flujo de datos.
+- [ ] **Sin secretos** en JSON (`x-apikey`, tokens, IDs sensibles, webhooks privados).
+- [ ] `.env.example` con **placeholders** claros.
+- [ ] **Capturas** en `img/` con datos **enmascarados**.
+- [ ] **Licencia** compatible (MIT por defecto, o específica si aplica).
+- [ ] **Notas de límites/cuotas** de APIs externas (si procede).
+- [ ] (Opc.) `SECURITY.md` con guía de reporte responsable.
+
+---
+
+## 🗺️ Roadmap
+
+- Nuevos “checkers”: dominios/URLs, archivos (hash), reputación ASNs, feeds TI.
+- **Backoff/retries** ante *rate limits*.
+- **Dashboards** (Looker Studio/Grafana) a partir de registros.
+- **Plantillas** de alerting enriquecido (Markdown/HTML).
+- **Pipelines** CI para validar formato de workflows antes del commit.
+
+---
+
+## 🤝 Contribuir
+
+1. Haz **fork** y crea tu rama: `feature/lo-que-sea`.
+2. Sigue las **convecciones** y el **checklist de seguridad**.
+3. **Pull Request** descriptivo con capturas/diagramas en `docs/`/`img/`.
+
+> Cualquier contribución debe evitar publicar secretos y respetar el **principio de mínima exposición**.
 
 ---
 
 ## 📄 Licencia
 
-Este proyecto se distribuye bajo licencia **MIT** (ver `LICENSE`).
-
----
-
-## 🤝 Contribuciones
-
-Sugerencias y PRs son bienvenidos. Por favor, evita subir información sensible y respeta la guía de seguridad.
+Este repositorio se distribuye bajo licencia **MIT**. Ver [LICENSE](./LICENSE).
