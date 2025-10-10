@@ -1,0 +1,14 @@
+# n8n / entorno
+.n8n/
+.env
+*.env
+*.local
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Imágenes pesadas temporales
+*.tmp

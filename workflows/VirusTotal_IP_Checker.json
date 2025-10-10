@@ -1,0 +1,500 @@
+{
+  "name": "VirusTotal_IP_Checker",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/ip_addresses/{{$input.first().json.ip}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "YOUR_VT_API_KEY"
+            },
+            {
+              "name": "accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        -368
+      ],
+      "id": "fcea523e-e46d-46e4-bfd3-b654e143cc73",
+      "name": "VT Lookup (IP)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesa SOLO el item actual de la iteración\nconst input = $input.item.json;\n\n// En el HTTP node, la respuesta suele llegar como { data: {...} }\nconst data = input?.data || {};\nconst attrs = data?.attributes || {};\nconst stats = attrs.last_analysis_stats || {};\n\n// Intentamos conservar la IP: primero la que devuelve VT (data.id), si no, la que venía antes\nconst ip = data?.id || input?.ip || \"desconocida\";\n\nconst malicious   = Number(stats.malicious || 0);\nconst suspicious  = Number(stats.suspicious || 0);\nconst harmless    = Number(stats.harmless || 0);\nconst undetected  = Number(stats.undetected || 0);\nconst reputation  = Number(attrs.reputation || 0);\nconst country     = attrs.country || \"N/A\";\nconst asn         = attrs.asn || \"N/A\";\nconst asOwner     = attrs.as_owner || \"N/A\";\n\nconst flagged = (malicious + suspicious) > 0 || reputation < 0;\nconst vtLink  = `https://www.virustotal.com/gui/ip-address/${ip}`;\n\n\nconst shortMsg =\n  `🔎 IP: ${ip}\\n` +\n  `🌍 ASN: ${asn} (${asOwner}) | País: ${country}\\n` +\n  `🧪 VT: mal:${malicious} susp:${suspicious} ok:${harmless} undet:${undetected} rep:${reputation}\\n` +\n  `🔗 ${vtLink}\\n` +\n  (flagged ? \"⚠️ *POSIBLE RIESGO DETECTADO*\" : \"✅ Sin indicios de malicia\");\n\nreturn {\n  json: {\n    summary: {\n      ip,\n      flagged,\n      malicious,\n      suspicious,\n      harmless,\n      undetected,\n      reputation,\n      country,\n      asn,\n      asOwner,\n      vt_link: vtLink\n    },\n    message: shortMsg\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        -368
+      ],
+      "id": "56b8f3c1-532a-44a6-aa8b-518f690f1df2",
+      "name": "Parse VT Response"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "389e435b-ef44-48f3-9778-386a522fbaf0",
+              "leftValue": "={{ $json.summary.flagged }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        -368
+      ],
+      "id": "f6df90a5-e879-43ab-8632-3b59e26858de",
+      "name": "Is Risk?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "={{ $('Parse VT Response').item.json.message }}",
+        "additionalFields": {
+          "disable_web_page_preview": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1392,
+        -384
+      ],
+      "id": "327c09ef-6a52-49e9-a848-17adf9114f80",
+      "name": "Send a text message",
+      "webhookId": "redacted-webhook-id",
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "your_sheet_name",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Hoja 1",
+          "mode": "list",
+          "cachedResultName": "Hoja 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "ip": "={{ $json.ip }}",
+            "flagged": "={{ $json.flagged }}",
+            "malicious": "={{ $json.malicious }}",
+            "suspicious": "={{ $json.suspicious }}",
+            "harmless": "={{ $json.harmless }}",
+            "undetected": "={{ $json.undetected }}",
+            "reputation": "={{ $json.reputation }}",
+            "country": "={{ $json.country }}",
+            "asOwner": "={{ $json.asOwner }}",
+            "vt_link": "={{ $json.vt_link }}",
+            "asn": "={{ $json.asn }}"
+          },
+          "matchingColumns": [
+            "day_key"
+          ],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ip",
+              "displayName": "ip",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "flagged",
+              "displayName": "flagged",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "malicious",
+              "displayName": "malicious",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "suspicious",
+              "displayName": "suspicious",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "harmless",
+              "displayName": "harmless",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "undetected",
+              "displayName": "undetected",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reputation",
+              "displayName": "reputation",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "country",
+              "displayName": "country",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "asn",
+              "displayName": "asn",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "asOwner",
+              "displayName": "asOwner",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "vt_link",
+              "displayName": "vt_link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "day_key",
+              "displayName": "day_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2160,
+        288
+      ],
+      "id": "5e6dcf6a-a42c-41b2-abe3-5ed703242e9a",
+      "name": "Send to Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "REPLACE_WITH_CREDENTIAL_NAME"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Soporta ambos formatos de Webhook de n8n:\n// $json = { body:{ ips:[...] }, headers:{...}, query:{...} }  <-- caso típico\n// $json = { ips:[...] }                                       <-- caso alterno\n\n// 0) Toma payload y headers correctos\nconst payload = ($json && typeof $json.body === 'object') ? $json.body : $json;\n\n// 1) Extrae y normaliza IPs\nlet ips = [];\nif (Array.isArray(payload.ips)) {\n  ips = payload.ips;\n} else if (typeof payload.ips === 'string') {\n  // admite \"1.1.1.1, 8.8.8.8 185.220.101.1\"\n  ips = payload.ips.split(/[,;\\s]+/);\n}\n\n// 2) Limpieza y deduplicado\nips = [...new Set(ips.map(x => String(x).trim()).filter(Boolean))];\n\n// 3) Filtro IPv4 (simple y suficiente para nuestro caso)\nconst isIPv4 = ip => /^\\d{1,3}(\\.\\d{1,3}){3}$/.test(ip);\nips = ips.filter(isIPv4);\n\n// 4) Validación final\nif (ips.length === 0) {\n  throw new Error('No valid IPs in payload. Expect body like { \"ips\": [\"1.2.3.4\", ...] } or a string \"1.2.3.4,5.6.7.8\"');\n}\n\n// 5) Emite un item por IP\nreturn ips.map(ip => ({ json: { ip } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        16
+      ],
+      "id": "e7226acc-cc73-4aca-978d-0fe266fd895b",
+      "name": "Validate & Prepare (Webhook)"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        -368
+      ],
+      "id": "a2bf9a8e-28ee-4d83-8e77-dabcb968a61e",
+      "name": "Wait",
+      "webhookId": "redacted-webhook-id"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vt-ip-checker-{{YOUR_TOKEN}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1056,
+        16
+      ],
+      "id": "e10318f7-5bc7-4333-92bf-914e26daefd0",
+      "name": "Webhook",
+      "webhookId": "redacted-webhook-id"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -512,
+        16
+      ],
+      "id": "305c28cf-af0d-485f-a647-0e08a3378ee2",
+      "name": "split in baches",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1424,
+        0
+      ],
+      "id": "3814878b-a324-4066-8158-b1873b4d1595",
+      "name": "Next Batch"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Obtener datos directamente\nconst summary = $input.item.json.summary;\nconst date = new Date().toISOString().slice(0,10);\n\n// Si no existe summary, lanzar error para saber qué está pasando\nif (!summary) {\n  throw new Error('Summary no existe. Datos: ' + JSON.stringify($input.item.json, null, 2));\n}\n\n// Retornar los datos con timestamp\nreturn {\n  json: {\n    timestamp: new Date().toISOString(),\n    ip: summary.ip,\n    flagged: summary.flagged,\n    malicious: summary.malicious,\n    suspicious: summary.suspicious,\n    harmless: summary.harmless,\n    undetected: summary.undetected,\n    reputation: summary.reputation,\n    country: summary.country,\n    asn: summary.asn,\n    asOwner: summary.asOwner,\n    vt_link: summary.vt_link,\n    day_key: `${summary.ip}_${date}`\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        -800
+      ],
+      "id": "5e350fb2-f13f-4ea4-9e1c-f7c64966e34f",
+      "name": "Code Build Row"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "VT Lookup (IP)": {
+      "main": [
+        [
+          {
+            "node": "Parse VT Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse VT Response": {
+      "main": [
+        [
+          {
+            "node": "Is Risk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Risk?": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code Build Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Validate & Prepare (Webhook)": {
+      "main": [
+        [
+          {
+            "node": "split in baches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "VT Lookup (IP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to Sheets": {
+      "main": [
+        [
+          {
+            "node": "split in baches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare (Webhook)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "split in baches": {
+      "main": [
+        [
+          {
+            "node": "Next Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Batch": {
+      "main": [
+        []
+      ]
+    },
+    "Code Build Row": {
+      "main": [
+        [
+          {
+            "node": "Send to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "redacted-version-id",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "redacted-instance-id"
+  },
+  "id": "hXbaNaWS6t9nyvxU",
+  "tags": []
+}
