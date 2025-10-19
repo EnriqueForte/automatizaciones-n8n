@@ -31,7 +31,7 @@ Repositorio monorepo con **automatizaciones de ciberseguridad** construidas en *
   **Uso:** Importar `workflows/VirusTotal_IP_Checker.json` en n8n, configurar credenciales y probar el webhook.
 - **[IP_Reputation_Tracker](./IP_Reputation_Tracker/)**  
   **Descripción:** Toma IPs desde **Google Sheets**, consulta su reputación en **AbuseIPDB**, dispara **alertas en Telegram** si el `abuseConfidenceScore` supera el umbral, guarda **histórico en Sheets** y envía un **informe HTML** por **Gmail**.  
-  **Carpetas:** `workflow/`, `docs/`, `docs/images/`  
+  **Carpetas:** `workflow/`, `docs/`, `img/`  
   **Uso:** Importar `workflow/ip_reputation_tracker.json` en n8n, asociar credenciales (HTTP/AbuseIPDB, Telegram, Google Sheets, Gmail), configurar IDs de tus Sheets y las variables de entorno `ABUSEIPDB_API_KEY`, `TELEGRAM_CHAT_ID`, `REPORT_EMAIL`.
 
 
