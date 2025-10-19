@@ -1,0 +1,692 @@
+{
+  "name": "IP Reputation Tracker con AbuseIPDB",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// Code node -> Mode: \"Run Once for All Items\"\n// Lee IPs desde Google Sheets\n\nconst isIPv4 = ip => /^(25[0-5]|2[0-4]\\d|1?\\d?\\d)(\\.(25[0-5]|2[0-4]\\d|1?\\d?\\d)){3}$/.test(ip);\nconst isIPv6 = ip => typeof ip === 'string' && ip.includes(':') && ip.length >= 3 && ip.length <= 45;\n\n// Recolectar IPs desde las filas del sheet\nlet candidates = [];\n\nfor (const item of items) {\n  const row = item.json;\n  \n  // La IP está en la columna A (puede venir como \"A\", \"IP\" o la primera columna)\n  const ipValue = row.A || row.IP || row[Object.keys(row)[0]];\n  \n  if (ipValue && typeof ipValue === 'string') {\n    candidates.push(ipValue.trim());\n  }\n}\n\nconsole.log('IPs candidatas desde sheet:', candidates);\n\n// Validar y eliminar duplicados\nconst uniqueIPs = [...new Set(candidates)];\nconst validIPs = [];\n\nfor (const ip of uniqueIPs) {\n  if (!ip) continue;\n  \n  const cleanIP = String(ip).trim();\n  \n  if (isIPv4(cleanIP) || isIPv6(cleanIP)) {\n    validIPs.push(cleanIP);\n  } else {\n    console.log('IP inválida ignorada:', cleanIP);\n  }\n}\n\nconsole.log('IPs válidas a procesar:', validIPs);\n\n// Devolver un item por cada IP válida\nreturn validIPs.map(ip => ({ json: { ip } }));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1376,
+        -352
+      ],
+      "id": "4cc41914-44c8-4998-9e51-13ae6033f05b",
+      "name": "Parse & Normalize",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "https://api.abuseipdb.com/api/v2/check",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ipAddress",
+              "value": "={{$json[\"ip\"]}}"
+            },
+            {
+              "name": "maxAgeInDays",
+              "value": "90"
+            },
+            {
+              "name": "verbose",
+              "value": "true"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Key",
+              "value": "={{$env.ABUSEIPDB_API_KEY}}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1056,
+        -352
+      ],
+      "id": "85fc23e9-7645-4b5b-bb4f-f6e09b3432ea",
+      "name": "HTTP AbuseIPDB",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "231da32c-6b70-4d54-aa29-83db6719c620",
+              "leftValue": "={{ $json.data.abuseConfidenceScore }}",
+              "rightValue": 50,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -912,
+        80
+      ],
+      "id": "0e3dc076-b6e3-4520-84d0-b87cce226bb7",
+      "name": "If Evaluación de Riesgo",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ef9560e1-51e2-49c5-9c2c-49dcf43670dc",
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}",
+              "type": "string"
+            },
+            {
+              "id": "7f67b6ae-9867-47ae-8f14-ce88401aea34",
+              "name": "ip",
+              "value": "={{ $json.data.ipAddress }}",
+              "type": "string"
+            },
+            {
+              "id": "b3bebebf-c4f6-453d-856c-54333a751f46",
+              "name": "abuseConfidenceScore",
+              "value": "={{ $json.data.abuseConfidenceScore }}",
+              "type": "string"
+            },
+            {
+              "id": "c206b11a-57f5-455e-b2df-d355a97ece10",
+              "name": "totalReports",
+              "value": "={{ $json.data.totalReports }}",
+              "type": "string"
+            },
+            {
+              "id": "7357431c-d9ed-4de5-bc08-fa0c6c67200a",
+              "name": "lastReportedAt",
+              "value": "={{ $json.data.lastReportedAt }}",
+              "type": "string"
+            },
+            {
+              "id": "be5f857a-c20b-4df3-b72e-9a26b901e2c8",
+              "name": "countryCode",
+              "value": "={{ $json.data.countryCode }}",
+              "type": "string"
+            },
+            {
+              "id": "6735ab69-6bdc-4e54-b417-1bf9d66c641e",
+              "name": "isp",
+              "value": "={{ $json.data.isp }}",
+              "type": "string"
+            },
+            {
+              "id": "02c72646-5a7c-4f8a-9e58-a4eafd5bdb89",
+              "name": "domain",
+              "value": "={{ $json.data.domain }}",
+              "type": "string"
+            },
+            {
+              "id": "9e1ceaf3-1c6e-4752-a410-cdfdc5b14a87",
+              "name": "usageType",
+              "value": "={{ $json.data.usageType }}",
+              "type": "string"
+            },
+            {
+              "id": "4d3f98da-72ff-49cf-b69d-52586bc804b6",
+              "name": "isWhitelisted",
+              "value": "={{ $json.data.isWhitelisted ? true : false }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        80
+      ],
+      "id": "5d520e77-17e9-48d2-a3f1-678a270d5ff3",
+      "name": "Mapeo Campos"
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "<GOOGLE_SHEET_ID_LOG>",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "abuseConfidenceScore": "={{ $json.abuseConfidenceScore }}",
+            "ip": "={{ $json.ip }}",
+            "totalReports": "={{ $json.totalReports }}",
+            "countryCode": "={{ $json.countryCode }}",
+            "isp": "={{ $json.isp }}",
+            "domain": "={{ $json.domain }}",
+            "usageType": "={{ $json.usageType }}",
+            "isWhitelisted": "={{ $json.isWhitelisted }}",
+            "day_key": "={{ $json.day_key }}",
+            "lastReportedAt": "={{ $json.lastReportedAt }}"
+          },
+          "matchingColumns": [
+            "day_key"
+          ],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ip",
+              "displayName": "ip",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "abuseConfidenceScore",
+              "displayName": "abuseConfidenceScore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "totalReports",
+              "displayName": "totalReports",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "lastReportedAt",
+              "displayName": "lastReportedAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "countryCode",
+              "displayName": "countryCode",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "isp",
+              "displayName": "isp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "domain",
+              "displayName": "domain",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "usageType",
+              "displayName": "usageType",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "isWhitelisted",
+              "displayName": "isWhitelisted",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "day_key",
+              "displayName": "day_key",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        400,
+        80
+      ],
+      "id": "3cb67df8-5e7f-41b2-bd48-ba736098beef",
+      "name": "Historico",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "=<b>🚨 IP maliciosa detectada</b>\nIP: <code>{{ $json.data.ipAddress }}</code>\nScore: <b>{{ $json.data.abuseConfidenceScore }}</b>\nReports: {{ $json.data.totalReports }}\nÚltimo: {{ $json.data.lastReportedAt || 'N/A' }}\nPaís: {{ $json.data.countryCode || 'N/A' }}\nISP: {{ $json.data.isp || 'N/A' }}\nDominio: {{ $json.data.domain || 'N/A' }}\nUso: {{ $json.data.usageType || 'N/A' }}\n",
+        "replyMarkup": "=none",
+        "forceReply": {},
+        "replyKeyboardOptions": {},
+        "replyKeyboardRemove": {},
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -368,
+        -272
+      ],
+      "id": "d99a5b94-baa0-4e9c-90fa-4fd0e8691ea4",
+      "name": "Alert",
+      "webhookId": "",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "<GOOGLE_SHEET_ID_LOG>",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "A1:K"
+            }
+          },
+          "outputFormatting": {
+            "values": {
+              "general": "UNFORMATTED_VALUE",
+              "date": "FORMATTED_STRING"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1072,
+        -528
+      ],
+      "id": "b9a64369-45e9-4572-86e0-b9927c71f58b",
+      "name": "Obtengo datos",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "// Al inicio del código del Resumen\nconsole.log('Items recibidos:', items.length);\nconsole.log('Primer item:', JSON.stringify(items[0]));\n\nconst tzOffsetMinutes = 0;\nconst now = new Date(Date.now() + tzOffsetMinutes * 60000);\nconst today = now.toISOString().slice(0,10);\nconst THRESHOLD = 50;\n\n// Calcular el tiempo de inicio de la ejecución (hace 5 minutos)\nconst executionStartTime = new Date(Date.now() - 5 * 60 * 1000);\n\nconst esc = s => String(s ?? '')\n  .replace(/&/g,'&amp;')\n  .replace(/</g,'&lt;')\n  .replace(/>/g,'&gt;');\n\n// Normaliza filas\nconst rows = items.map(i => i.json).map(r => ({\n  timestamp: r.timestamp || '',\n  ip: String(r.ip ?? ''),\n  score: Number(r.abuseConfidenceScore ?? 0),\n  reports: Number(r.totalReports ?? 0),\n  lastReportedAt: r.lastReportedAt || '',\n  country: r.countryCode || '',\n  isp: r.isp || '',\n  domain: r.domain || '',\n  usageType: r.usageType || '',\n  whitelisted: (String(r.isWhitelisted || '')).toUpperCase() === 'TRUE',\n  day_key: r.day_key || ''\n}));\n\n// Filtra solo las IPs de esta ejecución (últimos 5 minutos)\nconst todayRows = rows.filter(r => {\n  if (!r.timestamp) return false;\n  const rowTime = new Date(r.timestamp);\n  return rowTime >= executionStartTime;\n});\n\nconsole.log('Filas filtradas (últimos 5 min):', todayRows.length);\n\n// Métricas\nconst totalConsultas = todayRows.length;\nconst totalAlertas = todayRows.filter(r => r.score > THRESHOLD).length;\nconst distintasIPs = new Set(todayRows.map(r => r.ip)).size;\n\nconsole.log('totalAlertas calculado:', totalAlertas);\n\n// Construye HTML con una tabla (TÍTULO MODIFICADO)\nlet html = `\n  <div style=\"font-family:system-ui,Segoe UI,Roboto,Arial;line-height:1.3;color:#111\">\n    <h2>AbuseIPDB — Resumen diario</h2>\n    <p><strong>Fecha:</strong> ${today} · <strong>Consultas:</strong> ${totalConsultas} · <strong>IPs únicas:</strong> ${distintasIPs}</p>\n    <hr/>\n    <h3 style=\"margin-bottom:6px\">Detalles (todas las IPs escaneadas)</h3>\n    <table style=\"border-collapse:collapse;width:100%;font-size:13px\">\n      <thead>\n        <tr>\n          <th style=\"text-align:left;padding:6px;border-bottom:1px solid #ddd\">IP</th>\n          <th style=\"text-align:right;padding:6px;border-bottom:1px solid #ddd\">Score</th>\n          <th style=\"text-align:right;padding:6px;border-bottom:1px solid #ddd\">Reports</th>\n          <th style=\"text-align:left;padding:6px;border-bottom:1px solid #ddd\">Pais</th>\n          <th style=\"text-align:left;padding:6px;border-bottom:1px solid #ddd\">ISP</th>\n          <th style=\"text-align:left;padding:6px;border-bottom:1px solid #ddd\">Dominio</th>\n          <th style=\"text-align:left;padding:6px;border-bottom:1px solid #ddd\">Último reporte</th>\n        </tr>\n      </thead>\n      <tbody>\n`;\n\nif (todayRows.length === 0) {\n  html += `<tr><td colspan=\"7\" style=\"padding:10px\">No hay datos para esta ejecución.</td></tr>`;\n} else {\n  for (const r of todayRows) {\n    const scoreColor = r.score > THRESHOLD ? 'color:#a00;font-weight:700' : 'color:inherit';\n    html += `\n      <tr>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0\"><code>${esc(r.ip)}</code></td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0;text-align:right\"><span style=\"${scoreColor}\">${r.score}</span></td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0;text-align:right\">${r.reports}</td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0\">${esc(r.country)}</td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0\">${esc(r.isp)}</td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0\">${esc(r.domain)}</td>\n        <td style=\"padding:6px;border-bottom:1px solid #f0f0f0\">${esc(r.lastReportedAt)}</td>\n      </tr>\n    `;\n  }\n}\n\nhtml += `\n      </tbody>\n    </table>\n    <hr/>\n    <p style=\"font-size:12px;color:#666\">Este es un informe automatizado generado por AbuseIPDB-AutoTracker.</p>\n  </div>\n`;\n\nconst telegramText = `📊 Resumen ${today}: ${totalConsultas} consultas · ${distintasIPs} IPs únicas · ${totalAlertas} alertas (> ${THRESHOLD})`;\n\nreturn [{\n  json: {\n    today,\n    subject: `AbuseIPDB - Resumen diario ${today}`,\n    html,\n    telegramText,\n    totalConsultas,\n    totalAlertas,\n    distintasIPs,\n    threshold: THRESHOLD\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        -528
+      ],
+      "id": "7a3deb64-214e-43d0-9b83-ec986ba6d5df",
+      "name": "Resumen"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -528
+      ],
+      "id": "0ae06bbb-2595-4060-a712-2744107f2aaf",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -368,
+        80
+      ],
+      "id": "844e4fce-4b5d-4d2a-9129-567973537d66",
+      "name": "Merge"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1952,
+        -352
+      ],
+      "id": "3bd566aa-1a40-4b41-8b94-71441db59f14",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "<GOOGLE_SHEET_ID_INPUTS>",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "",
+          "cachedResultUrl": ""
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "A1:A"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -1664,
+        -352
+      ],
+      "id": "dc3fea4b-09bb-411f-814a-b34e7e92cc16",
+      "name": "Obtener IPs",
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date().toISOString().slice(0,10);\nconst seen = new Set();\nconst out = [];\n\nfor (const it of items) {\n  const j = it.json || {};\n  const ip = j.ip || j.data?.ipAddress;\n  if (!ip) continue;\n\n  const day_key = `${ip}_${today}`;\n  if (seen.has(day_key)) continue;\n  seen.add(day_key);\n\n  out.push({\n    json: {\n      timestamp: j.timestamp || new Date().toISOString(),\n      ip,\n      abuseConfidenceScore: Number(j.abuseConfidenceScore ?? j.data?.abuseConfidenceScore ?? 0),\n      totalReports: Number(j.totalReports ?? j.data?.totalReports ?? 0),\n      lastReportedAt: j.lastReportedAt ?? j.data?.lastReportedAt ?? '',\n      countryCode: j.countryCode ?? j.data?.countryCode ?? '',\n      isp: j.isp ?? j.data?.isp ?? '',\n      domain: j.domain ?? j.data?.domain ?? '',\n      usageType: j.usageType ?? j.data?.usageType ?? '',\n      isWhitelisted: (typeof j.isWhitelisted === 'boolean')\n        ? j.isWhitelisted\n        : !!(j.isWhitelisted ?? j.data?.isWhitelisted),\n      day_key,\n    }\n  });\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        176,
+        80
+      ],
+      "id": "be6b36fe-a51f-4e61-9301-987621113884",
+      "name": "day_key & variables",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sendTo": "={{$env.REPORT_EMAIL}}",
+        "subject": "=={{$json.subject}}",
+        "message": "=={{$json.html}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1648,
+        -528
+      ],
+      "id": "bdbf3dcd-3b59-4428-a9d7-34c46dcb4064",
+      "name": "Envío Informe",
+      "webhookId": "",
+      "credentials": {}
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Parse & Normalize": {
+      "main": [
+        [
+          {
+            "node": "HTTP AbuseIPDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP AbuseIPDB": {
+      "main": [
+        [
+          {
+            "node": "If Evaluación de Riesgo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Evaluación de Riesgo": {
+      "main": [
+        [
+          {
+            "node": "Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Mapeo Campos": {
+      "main": [
+        [
+          {
+            "node": "day_key & variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Historico": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert": {
+      "main": [
+        []
+      ]
+    },
+    "Obtengo datos": {
+      "main": [
+        [
+          {
+            "node": "Resumen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resumen": {
+      "main": [
+        [
+          {
+            "node": "Envío Informe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Obtengo datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Mapeo Campos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Obtener IPs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener IPs": {
+      "main": [
+        [
+          {
+            "node": "Parse & Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "day_key & variables": {
+      "main": [
+        [
+          {
+            "node": "Historico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envío Informe": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b36636fe-b5f4-4830-aad0-55690a3b5b74",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": ""
+  },
+  "id": "ZqLVxW50fP6MJXXi",
+  "tags": []
+}

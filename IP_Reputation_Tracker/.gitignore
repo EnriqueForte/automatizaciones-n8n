@@ -1,0 +1,15 @@
+# Local configs / secrets
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# n8n execution data (if you export runs)
+*.sqlite
+backup/
